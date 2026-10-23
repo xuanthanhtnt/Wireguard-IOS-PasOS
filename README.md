@@ -80,7 +80,7 @@ Mọi sự kiện (đổi IP, tạm ngắt, kết nối lại) được ghi vào
 
 ### Cách 1 — GitHub Actions (không cần máy Mac)
 1. Mỗi lần đẩy mã lên nhánh `main`, workflow **Build WG VPN IPA** chạy trên máy macOS của GitHub (miễn phí cho repo công khai), hoặc bấm *Run workflow* trong tab **Actions**.
-2. Sau ~15–25 phút, tải IPA trong mục **Artifacts** của lần chạy, hoặc trang **Releases** (`v1.0.N`).
+2. Sau ~5–10 phút, tải IPA trong mục **Artifacts** của lần chạy, hoặc trang **Releases** (`v1.0.N`).
 
 **Ký sẵn IPA (tùy chọn, cần Apple Developer trả phí):**
 1. Trên developer.apple.com tạo 2 App ID: `com.tencuaban.wgvpn` và `com.tencuaban.wgvpn.network-extension`, bật **Network Extensions** và **App Groups** (group `group.com.tencuaban.wgvpn`) cho cả hai.

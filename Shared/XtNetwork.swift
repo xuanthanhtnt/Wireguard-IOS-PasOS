@@ -7,6 +7,7 @@
 
 import Foundation
 import Network
+import Security
 
 struct XtLookupResult {
     var system: [String] = []

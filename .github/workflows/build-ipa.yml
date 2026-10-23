@@ -92,7 +92,13 @@ jobs:
             MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             build 2>&1 | tee build/xcodebuild.log | grep -E "error:|warning: (unre|var|init)|\*\* BUILD|Undefined symbol|ld: " || true
-          grep -q "\*\* BUILD SUCCEEDED \*\*" build/xcodebuild.log || { echo "::error::xcodebuild failed"; grep -E "error:" build/xcodebuild.log | sort -u | head -100; exit 1; }
+          if ! grep -q "\*\* BUILD SUCCEEDED \*\*" build/xcodebuild.log; then
+            grep -E "error:|Undefined symbol|ld: " build/xcodebuild.log | sed -E "s#$GITHUB_WORKSPACE/##g" | sort -u | head -150 > build/errors.txt || true
+            cat build/errors.txt
+            # One annotation with every error, readable from the Checks API
+            echo "::error title=xcodebuild failed::$(perl -pe 's/%/%25/g; s/\r//g; s/\n/%0A/g' build/errors.txt)"
+            exit 1
+          fi
 
       - name: Upload build log
         if: always()
@@ -101,6 +107,24 @@ jobs:
           name: xcodebuild-log
           path: build/xcodebuild.log
           if-no-files-found: ignore
+
+      - name: Save build log to the ci-logs branch
+        if: always()
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          LOGDIR="$RUNNER_TEMP/ci-logs"
+          rm -rf "$LOGDIR" && mkdir -p "$LOGDIR"
+          if [ -f build/xcodebuild.log ]; then
+            sed -E "s#$GITHUB_WORKSPACE/##g" build/xcodebuild.log | gzip -9 > "$LOGDIR/xcodebuild.log.gz"
+            grep -nE "error:|warning:|Undefined symbol|ld: " build/xcodebuild.log | sed -E "s#$GITHUB_WORKSPACE/##g" > "$LOGDIR/diagnostics.txt" || true
+          fi
+          echo "run ${{ github.run_number }} ${{ github.sha }} ${{ job.status }}" > "$LOGDIR/README.txt"
+          cd "$LOGDIR"
+          git init -q -b ci-logs
+          git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -qm "Build log of run ${{ github.run_number }}"
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git" ci-logs || echo "::warning::could not push ci-logs"
 
       - name: Package IPA
         run: |

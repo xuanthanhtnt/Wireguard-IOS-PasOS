@@ -1,0 +1,103 @@
+# XcodeGen project for WG VPN (iOS / iPadOS)
+#   brew install xcodegen && xcodegen generate && open WGVPN.xcodeproj
+name: WGVPN
+options:
+  bundleIdPrefix: com.wgvpn
+  deploymentTarget:
+    iOS: "16.0"
+  developmentLanguage: vi
+  createIntermediateGroups: true
+  groupSortPosition: top
+settings:
+  base:
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    APP_BUNDLE_ID: com.wgvpn.app
+    APP_GROUP_ID: group.$(APP_BUNDLE_ID)
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    ENABLE_BITCODE: NO
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    DEAD_CODE_STRIPPING: YES
+    GCC_C_LANGUAGE_STANDARD: gnu11
+    CLANG_ENABLE_MODULES: YES
+    SWIFT_STRICT_CONCURRENCY: minimal
+    HEADER_SEARCH_PATHS: "$(inherited) $(SRCROOT)/WireGuardKit/C"
+targets:
+  WGVPN:
+    type: application
+    platform: iOS
+    sources:
+      - path: WGVPN
+      - path: Shared
+      - path: WireGuardKit/Sources
+        excludes:
+          - WireGuardAdapter.swift
+      - path: WireGuardKit/C
+    dependencies:
+      - target: WGVPNTunnel
+        embed: true
+    settings:
+      base:
+        PRODUCT_NAME: WGVPN
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID)
+        INFOPLIST_FILE: WGVPN/Info.plist
+        CODE_SIGN_ENTITLEMENTS: WGVPN/WGVPN.entitlements
+        SWIFT_OBJC_BRIDGING_HEADER: WGVPN/WGVPN-Bridging-Header.h
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        PROVISIONING_PROFILE_SPECIFIER: $(WGVPN_APP_PROFILE)
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks"
+  WGVPNTunnel:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: WGVPNTunnel
+      - path: Shared
+      - path: WireGuardKit/Sources
+      - path: WireGuardKit/C
+    preBuildScripts:
+      - name: Build WireGuard Go backend
+        basedOnDependencyAnalysis: false
+        script: |
+          set -e
+          cd "${SRCROOT}/WireGuardKit/Go"
+          export PATH="${PATH}:/usr/local/go/bin:/opt/homebrew/bin:/usr/local/bin"
+          if ! command -v go >/dev/null 2>&1; then
+            echo "error: Go is required to build the WireGuard backend (brew install go)"
+            exit 1
+          fi
+          make \
+            PLATFORM_NAME="${PLATFORM_NAME}" \
+            ARCHS="${ARCHS}" \
+            SDKROOT="${SDKROOT}" \
+            DEPLOYMENT_TARGET_CLANG_FLAG_NAME="${DEPLOYMENT_TARGET_CLANG_FLAG_NAME}" \
+            DEPLOYMENT_TARGET_CLANG_ENV_NAME="${DEPLOYMENT_TARGET_CLANG_ENV_NAME}" \
+            IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET}" \
+            DESTDIR="${SRCROOT}/WireGuardKit/Go/out/${PLATFORM_NAME}" \
+            BUILDDIR="${SRCROOT}/WireGuardKit/Go/.tmp/${PLATFORM_NAME}"
+    settings:
+      base:
+        PRODUCT_NAME: WGVPNTunnel
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).network-extension
+        INFOPLIST_FILE: WGVPNTunnel/Info.plist
+        CODE_SIGN_ENTITLEMENTS: WGVPNTunnel/WGVPNTunnel.entitlements
+        SWIFT_OBJC_BRIDGING_HEADER: WGVPNTunnel/WGVPNTunnel-Bridging-Header.h
+        APPLICATION_EXTENSION_API_ONLY: YES
+        LIBRARY_SEARCH_PATHS: "$(inherited) $(SRCROOT)/WireGuardKit/Go/out/$(PLATFORM_NAME)"
+        OTHER_LDFLAGS: "$(inherited) -lwg-go -lresolv"
+        PROVISIONING_PROFILE_SPECIFIER: $(WGVPN_EXT_PROFILE)
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"
+schemes:
+  WGVPN:
+    build:
+      targets:
+        WGVPN: all
+        WGVPNTunnel: all
+    run:
+      config: Debug
+    archive:
+      config: Release

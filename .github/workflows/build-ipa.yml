@@ -1,0 +1,156 @@
+name: Build WG VPN IPA
+
+# Builds the iOS / iPadOS app on every push to main, on version tags and on demand.
+#
+# Output (Actions › run › Artifacts, and a GitHub Release v1.0.N for main / tags):
+#   WGVPN-1.0.N.ipa                  ad-hoc signed with its entitlements: install with TrollStore,
+#                                    or re-sign with AltStore / SideStore / Sideloadly / ESign
+#   WGVPN-1.0.N-signed-<method>.ipa  only when the signing secrets below are set
+#
+# Optional repository secrets (Settings › Secrets and variables › Actions) for a ready-to-install IPA:
+#   IOS_CERTIFICATE_P12_BASE64, IOS_CERTIFICATE_PASSWORD, IOS_PROFILE_APP_BASE64, IOS_PROFILE_EXT_BASE64
+# (see README: a paid Apple Developer account is needed for the Network Extension entitlement)
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      BUILD_NUMBER: ${{ github.run_number }}
+      VERSION: 1.0.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Select Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -vi beta | sort -V | tail -1)
+          echo "Using $XCODE"
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.x"
+          cache: false
+
+      - name: Install XcodeGen
+        run: |
+          brew install xcodegen
+          xcodegen --version
+
+      - name: Resolve Go modules
+        working-directory: WireGuardKit/Go
+        run: |
+          go mod tidy
+          echo "------ go.mod"
+          cat go.mod
+
+      - name: Build WireGuard / AmneziaWG backend (iphoneos arm64)
+        working-directory: WireGuardKit/Go
+        run: |
+          make PLATFORM_NAME=iphoneos ARCHS=arm64 \
+            SDKROOT="$(xcrun --sdk iphoneos --show-sdk-path)" \
+            DEPLOYMENT_TARGET_CLANG_FLAG_NAME=miphoneos-version-min \
+            DEPLOYMENT_TARGET_CLANG_ENV_NAME=IPHONEOS_DEPLOYMENT_TARGET \
+            IPHONEOS_DEPLOYMENT_TARGET=16.0 \
+            DESTDIR="$PWD/out/iphoneos" BUILDDIR="$PWD/.tmp/iphoneos"
+          lipo -info out/iphoneos/libwg-go.a
+          ls -la out/iphoneos
+
+      - name: Upload Go module files
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-modules
+          path: |
+            WireGuardKit/Go/go.mod
+            WireGuardKit/Go/go.sum
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build app (unsigned)
+        run: |
+          set -o pipefail
+          mkdir -p build
+          xcodebuild -project WGVPN.xcodeproj -scheme WGVPN -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build/DerivedData \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build 2>&1 | tee build/xcodebuild.log | grep -E "error:|warning: (unre|var|init)|\*\* BUILD|Undefined symbol|ld: " || true
+          grep -q "\*\* BUILD SUCCEEDED \*\*" build/xcodebuild.log || { echo "::error::xcodebuild failed"; grep -E "error:" build/xcodebuild.log | sort -u | head -100; exit 1; }
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: build/xcodebuild.log
+          if-no-files-found: ignore
+
+      - name: Package IPA
+        run: |
+          APP=build/DerivedData/Build/Products/Release-iphoneos/WGVPN.app
+          ls -la "$APP" "$APP/PlugIns"
+          scripts/package-ipa.sh "$APP" "dist/WGVPN-$VERSION.ipa" group.com.wgvpn.app
+          unzip -l "dist/WGVPN-$VERSION.ipa" | tail -n 25
+
+      - name: Check signing secrets
+        id: signing
+        env:
+          P12: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          PROFILE_APP: ${{ secrets.IOS_PROFILE_APP_BASE64 }}
+          PROFILE_EXT: ${{ secrets.IOS_PROFILE_EXT_BASE64 }}
+        run: |
+          if [ -n "$P12" ] && [ -n "$PROFILE_APP" ] && [ -n "$PROFILE_EXT" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No signing secrets: only the ad-hoc IPA (TrollStore / re-signing tools) is built."
+          fi
+
+      - name: Build signed IPA
+        if: steps.signing.outputs.enabled == 'true'
+        env:
+          IOS_CERTIFICATE_P12_BASE64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROFILE_APP_BASE64: ${{ secrets.IOS_PROFILE_APP_BASE64 }}
+          IOS_PROFILE_EXT_BASE64: ${{ secrets.IOS_PROFILE_EXT_BASE64 }}
+        run: scripts/build-signed.sh "$VERSION" "$BUILD_NUMBER" dist
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: WG-VPN-ipa
+          path: dist/*.ipa
+          if-no-files-found: error
+
+      - name: Publish GitHub release
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', env.VERSION) }}
+          name: WG VPN iOS ${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          files: dist/*.ipa
+          make_latest: true
+          generate_release_notes: true
+          body: |
+            **WG VPN cho iPhone / iPad** – phiên bản ${{ env.VERSION }}
+
+            - `WGVPN-${{ env.VERSION }}.ipa`: cài bằng **TrollStore**, hoặc ký lại bằng **AltStore / SideStore / Sideloadly / ESign** với tài khoản Apple Developer trả phí (cần quyền Network Extension).
+            - Xem README để biết cách cài đặt và giới hạn của iOS.

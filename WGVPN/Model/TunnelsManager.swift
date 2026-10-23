@@ -12,19 +12,17 @@ final class TunnelItem: ObservableObject, Identifiable {
     @Published private(set) var status: NEVPNStatus
     @Published private(set) var revision = 0
 
+    /// Stable WG VPN id of the tunnel (assigned before the item is created, never changed).
+    nonisolated let id: String
+
     init(manager: NETunnelProviderManager) {
         self.manager = manager
         self.status = manager.connection.status
+        self.id = (manager.protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration?[WGVPNKeys.tunnelId] as? String
+            ?? manager.localizedDescription ?? "?"
     }
 
     var proto: NETunnelProviderProtocol? { manager.protocolConfiguration as? NETunnelProviderProtocol }
-
-    nonisolated var id: String { managerTunnelId }
-
-    private nonisolated var managerTunnelId: String {
-        (manager.protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration?[WGVPNKeys.tunnelId] as? String
-            ?? manager.localizedDescription ?? "?"
-    }
 
     var tunnelId: String { id }
     var name: String { manager.localizedDescription ?? "Tunnel" }

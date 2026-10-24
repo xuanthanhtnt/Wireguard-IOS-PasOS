@@ -70,6 +70,14 @@ targets:
             echo "error: Go is required to build the WireGuard backend (brew install go)"
             exit 1
           fi
+          if [ "${PLATFORM_NAME}" = "iphonesimulator" ]; then
+            echo "error: WG VPN cannot run on the Simulator (iOS has no VPN there). Choose your iPhone or iPad as the run destination."
+            exit 1
+          fi
+          # First local build: download the Go modules and write go.sum
+          if [ ! -f go.sum ]; then
+            go mod tidy
+          fi
           make \
             PLATFORM_NAME="${PLATFORM_NAME}" \
             ARCHS="${ARCHS}" \

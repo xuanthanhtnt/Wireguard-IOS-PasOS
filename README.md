@@ -93,13 +93,25 @@ Mọi sự kiện (đổi IP, tạm ngắt, kết nối lại) được ghi vào
 
    Bundle ID, Team ID và App Group được đọc tự động từ profile.
 
-### Cách 2 — Xcode trên máy Mac
-```bash
-brew install xcodegen go
-xcodegen generate
-open WGVPN.xcodeproj
-```
-Chọn Team của bạn cho 2 target `WGVPN` và `WGVPNTunnel`, đổi `APP_BUNDLE_ID` trong `project.yml` nếu cần, rồi Run trên máy thật (VPN không chạy trên Simulator). Thư viện WireGuard/AmneziaWG (Go) được build tự động ở bước đầu của target `WGVPNTunnel`.
+### Cách 2 — Xcode trên máy Mac (cài thẳng lên iPhone / iPad)
+Cần **tài khoản Apple Developer trả phí**: Xcode không cho “Personal Team” (Apple ID miễn phí) dùng quyền Network Extensions.
+
+1. Cài Xcode (App Store), [Homebrew](https://brew.sh), rồi:
+   ```bash
+   brew install xcodegen go
+   git clone https://github.com/xuanthanhtnt/Wireguard-IOS-PasOS.git
+   cd Wireguard-IOS-PasOS
+   ```
+2. Sửa 2 dòng trong `project.yml` (Team ID xem ở developer.apple.com › Account › Membership details):
+   ```yaml
+   APP_BUNDLE_ID: com.tencuaban.wgvpn
+   DEVELOPMENT_TEAM: "ABCDE12345"
+   ```
+3. `xcodegen generate && open WGVPN.xcodeproj` (chạy lại lệnh này mỗi khi sửa `project.yml`).
+4. Xcode › Settings › Accounts: đăng nhập Apple ID của tài khoản trả phí.
+5. Cắm iPhone/iPad bằng cáp, bấm **Tin cậy** trên máy; bật **Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển** rồi khởi động lại máy.
+6. Trên thanh công cụ Xcode chọn scheme **WGVPN** và chọn **iPhone/iPad thật** (không chọn Simulator), bấm **Run** (⌘R). Lần đầu build mất vài phút vì phải tải và build thư viện WireGuard/AmneziaWG (Go).
+7. Mở WG VPN trên máy, nhập cấu hình, cho phép **Thêm cấu hình VPN**. Làm lại bước 5–6 cho thiết bị thứ hai.
 
 ## Cấu trúc mã nguồn
 | Thư mục / tệp | Vai trò |

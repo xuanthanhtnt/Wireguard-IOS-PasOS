@@ -1,0 +1,14 @@
+879:WGVPNTunnel/ServerWatchdog.swift:784:17: warning: capture of 'self' with non-Sendable type 'Kicker?' in a '@Sendable' closure
+885:Shared/XtNetwork.swift:103:60: warning: capture of 'once' with non-Sendable type 'OnceBox<PhysicalPath>' in a '@Sendable' closure
+891:Shared/XtNetwork.swift:283:60: warning: capture of 'once' with non-Sendable type 'OnceBox<Bool>' in a '@Sendable' closure
+897:Shared/XtNetwork.swift:484:42: warning: capture of 'buffer' with non-Sendable type 'MiniHTTP.DataBuffer' in a '@Sendable' closure
+903:Shared/XtNetwork.swift:486:25: warning: capture of 'once' with non-Sendable type 'OnceBox<Result<Data, any Error>>' in a '@Sendable' closure
+909:Shared/XtNetwork.swift:498:48: warning: capture of 'once' with non-Sendable type 'OnceBox<Result<Data, any Error>>' in a '@Sendable' closure
+915:Shared/XtNetwork.swift:509:60: warning: capture of 'once' with non-Sendable type 'OnceBox<Result<Data, any Error>>' in a '@Sendable' closure
+1095:2026-10-24 02:30:40.544 appintentsmetadataprocessor[9309:31772] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
+1253:Shared/XtNetwork.swift:103:60: warning: capture of 'once' with non-Sendable type 'OnceBox<PhysicalPath>' in a '@Sendable' closure
+1259:Shared/XtNetwork.swift:283:60: warning: capture of 'once' with non-Sendable type 'OnceBox<Bool>' in a '@Sendable' closure
+1265:Shared/XtNetwork.swift:484:42: warning: capture of 'buffer' with non-Sendable type 'MiniHTTP.DataBuffer' in a '@Sendable' closure
+1271:Shared/XtNetwork.swift:486:25: warning: capture of 'once' with non-Sendable type 'OnceBox<Result<Data, any Error>>' in a '@Sendable' closure
+1277:Shared/XtNetwork.swift:498:48: warning: capture of 'once' with non-Sendable type 'OnceBox<Result<Data, any Error>>' in a '@Sendable' closure
+1283:Shared/XtNetwork.swift:509:60: warning: capture of 'once' with non-Sendable type 'OnceBox<Result<Data, any Error>>' in a '@Sendable' closure
